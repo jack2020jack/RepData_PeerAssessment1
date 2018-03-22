@@ -1,0 +1,108 @@
+---
+title: 'Reproducible Research: Peer Assessment 1'
+output:
+  pdf_document: 
+    keep_tex: yes
+  html_document:
+    keep_md: yes
+  word_document: default
+date: "December 26, 2016"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading and preprocessing the data
+
+```{r}
+library(ggplot2)
+library(lattice)
+library(gridExtra)
+
+setwd("~/R/coursera")
+mydf <- read.csv("activity.csv", stringsAsFactors=FALSE)
+
+dim(mydf)
+dim(mydf[complete.cases(mydf),]) 
+
+names(mydf)
+sum(is.na(mydf$steps))     ## There are NAs.
+sum(is.na(mydf$date))      ## There isn't NA.
+sum(is.na(mydf$interval))  ## There isn't NA.
+
+mydf2 <- mydf[complete.cases(mydf),] ## Remove rows contain NA.
+```
+
+## 1. What is mean total number of steps taken per day?
+
+```{r}
+myfun <- function(mydf) {
+    mydf <- aggregate(steps ~ date, mydf, FUN = sum)
+    steps_mean <- mean(mydf$steps)
+    steps_median <- median(mydf$steps)
+    q <- qplot(mydf$steps,
+               main = "Histogram for Steps per Day",
+               xlab = "Steps") +
+         geom_vline(xintercept = steps_mean, color = "red") +
+         geom_vline(xintercept = steps_median, color = "green") +
+         annotate("text", x = steps_mean, y = 12.5,
+                  label = paste("Mean Total", format(steps_mean))) +
+         annotate("text", x = steps_median, y = 11.7,
+                  label = paste("Median Total", format(steps_median)))
+}
+q1 <- myfun(mydf2); q1
+```
+
+## 2. What is the average daily activity pattern?
+
+```{r}
+mydf4 <- aggregate(steps ~ interval, mydf2, FUN = mean)
+max_steps <- max(mydf4$steps)
+max_interval <- mydf4[mydf4$steps == max_steps, ]$interval
+plot(mydf4$interval, mydf4$steps, type = "l",
+     main = "Average Daily Activity Pattern",
+     xlab = "Time Interval",
+     ylab = "Steps")
+abline(v=max_interval, col = "green")
+mtext(max_interval, side = 1, 
+      line = 0, at = max_interval,
+      col = "green")
+```
+
+## 3. Imputing missing values
+
+```{r}
+row_na <- nrow(mydf) - nrow(mydf2) ## 2304 rows with NA
+mydf5 <- mydf
+for (i in 1:nrow(mydf5)) {
+    if (is.na(mydf5[i, ]$steps)) {
+        mydf5[i, ]$steps <- 
+            mydf4[mydf4$interval == mydf5[i, ]$interval, ]$steps
+    }
+}
+q2 <- myfun(mydf5)
+grid.arrange(q2, q1, ncol=2)
+```
+
+## 4. Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+mydf5$day <- NA
+for (i in 1:nrow(mydf5)) {
+    if (weekdays(as.Date(mydf5[i, ]$date)) == "Saturday" | 
+        weekdays(as.Date(mydf5[i, ]$date)) == "Sunday") {
+       mydf5[i, ]$day <- "weekend"
+    } else {
+       mydf5[i, ]$day <- "weekday"
+    }
+}
+mydf5$day <- factor(mydf5$day)
+mydf6 <- aggregate(steps ~ interval + day, mydf5, FUN = mean)
+xyplot(steps ~ interval | factor(day), 
+       data = mydf6,
+       type = "l",
+       layout = c(1,2),
+       xlab = "Interval",
+       ylab = "Number of Steps")
+```
